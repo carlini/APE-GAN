@@ -17,7 +17,8 @@ class DCGAN(object):
   def __init__(self, sess, input_height=28, input_width=28, crop=False,
          batch_size=64, sample_num = 64, output_height=64, output_width=64, gf_dim=64, df_dim=64,
          gfc_dim=1024, dfc_dim=1024, dataset_name='mnist',checkpoint_dir=None,sample_dir=None, 
-         adversarial_path=None,ground_truth_path=None,test_path=None,save_path=None):
+               adversarial_path=None,ground_truth_path=None,test_path=None,save_path=None,
+               advin=None):
     """
     Args:
       sess: TensorFlow session
@@ -30,6 +31,7 @@ class DCGAN(object):
     self.sess = sess
     self.crop = crop
 
+    start_vars = set(x.name for x in tf.global_variables())
     self.batch_size = batch_size
     self.sample_num = sample_num
 
@@ -55,9 +57,9 @@ class DCGAN(object):
         self.test_path = adversarial_path
 
     if save_path != None:
-	self.save_path = save_path
+       self.save_path = save_path
     else:
-	self.save_path = "./data/resAPE-GAN.npy"
+       self.save_path = "./data/resAPE-GAN.npy"
 
     # batch normalization : deals with poor initialization helps gradient flow
     self.d_bn1 = batch_norm(name='d_bn1')
@@ -76,9 +78,18 @@ class DCGAN(object):
     self.grayscale = (self.c_dim == 1)
     self.gt = self.load_gt_data()
     
-    self.build_model()
+    self.build_model(advin)
+    end_vars = tf.global_variables()
+    self.new_vars = [x for x in end_vars if x.name not in start_vars]
+    if len(self.new_vars) > 0:
+      def fix(n):
+        if 'QQ' in n:
+          return n.split("QQ/")[1]
+        return n
+      new_vars = dict((fix(x.name)[:-2],x) for x in self.new_vars)
+      self.saver = tf.train.Saver(new_vars)
 
-  def build_model(self):
+  def build_model(self, advin=None):
     if self.crop:
       image_dims = [self.output_height, self.output_width, self.c_dim]
     else:
@@ -86,10 +97,13 @@ class DCGAN(object):
     
     self.gtInputs = tf.placeholder(
       tf.float32, [self.batch_size] + image_dims, name='ground_truth_images')
+
+    if advin is None:
+      self.advInputs = tf.placeholder(
+        tf.float32, [self.batch_size] + image_dims, name='adversarial_images')
+    else:
+      self.advInputs = advin
       
-    self.advInputs = tf.placeholder(
-      tf.float32, [self.batch_size] + image_dims, name='adversarial_images')
-    
     self.z_sum = histogram_summary("z", self.advInputs)
     
     self.G                  = self.generator(self.advInputs)
@@ -131,8 +145,6 @@ class DCGAN(object):
 
     self.d_vars = [var for var in t_vars if 'd_' in var.name]
     self.g_vars = [var for var in t_vars if 'g_' in var.name]
-
-    self.saver = tf.train.Saver()
 
   def train(self, config):
     d_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \

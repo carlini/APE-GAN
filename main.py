@@ -65,6 +65,7 @@ def main(_):
           save_path=FLAGS.save_path
           )
 
+    dcgan.load(FLAGS.checkpoint_dir)[0]
     #show_all_variables()
 
     if FLAGS.train:
