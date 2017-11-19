@@ -18,7 +18,7 @@ class DCGAN(object):
          batch_size=64, sample_num = 64, output_height=64, output_width=64, gf_dim=64, df_dim=64,
          gfc_dim=1024, dfc_dim=1024, dataset_name='mnist',checkpoint_dir=None,sample_dir=None, 
                adversarial_path=None,ground_truth_path=None,test_path=None,save_path=None,
-               advin=None):
+               advin=None, c_dim=1):
     """
     Args:
       sess: TensorFlow session
@@ -74,7 +74,7 @@ class DCGAN(object):
     self.sample_dir = sample_dir
 
     self.adv = self.load_adv_data()
-    self.c_dim = self.adv[0].shape[-1]
+    self.c_dim = c_dim
     self.grayscale = (self.c_dim == 1)
     self.gt = self.load_gt_data()
     
@@ -307,7 +307,7 @@ class DCGAN(object):
   @property
   def model_dir(self):
     return "{}_{}_{}_{}".format(
-        self.dataset_name, self.batch_size,
+        self.dataset_name, 64, # hack, but safe
         self.output_height, self.output_width)
       
   def save(self, checkpoint_dir, step):
